@@ -1,0 +1,44 @@
+# Environment & Secrets
+.env
+*.env.local
+
+# Java / Maven Build outputs
+dist/
+node_modules/
+target/
+*.class
+*.jar
+*.war
+.mvn/
+.classpath
+.project
+.settings/
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Python Bytecode & Environments
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.venv/
+.pytest_cache/
+.coverage
+htmlcov/
+*.pkl
+
+# Logs
+*.log
+logs/
+
+# Audio / Temp uploads
+scratch/
+temp_recordings/
+uploads/
+
+# OS junk
+.DS_Store
+Thumbs.db

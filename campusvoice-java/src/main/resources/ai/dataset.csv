@@ -1,0 +1,31 @@
+text,category,priority
+"Exposed electrical wire in the computer lab is sparking and could cause electric shock",Electricity,HIGH
+"Water pipe burst in hostel corridor flooding the second floor",Infrastructure,HIGH
+"Classroom projector not working in CSE Block Room 302",Academic,MEDIUM
+"Need more chairs in central library reading section",Library,LOW
+"Ceiling fan fell off in Lecture Hall 4 injuring no one but very dangerous",Infrastructure,HIGH
+"Someone reported ragging in senior boys hostel block C",Ragging,HIGH
+"Harassment incident reported near main entrance gate",Harassment,HIGH
+"Gas leak smelled near college canteen kitchen",Food/Canteen,HIGH
+"Broken window glass in hostel room 204",Hostel,MEDIUM
+"WiFi network speed is extremely slow in main library",Internet/WiFi,LOW
+"Restroom on ground floor needs proper cleaning and soap replenishment",Sanitation,LOW
+"College bus route 5 was 45 minutes late today",Transport,MEDIUM
+"Lab computer 14 mouse is not functioning",Academic,LOW
+"Exposed high voltage transformer box near playground gate",Electricity,HIGH
+"Drinking water cooler near canteen is dispensing dirty water",Water,HIGH
+"Hall ticket generation error on student portal for semester exam",Examination,MEDIUM
+"Library book return counter is overcrowded during lunch break",Library,LOW
+"Fire extinguisher in Chemistry Lab expired 6 months ago",Infrastructure,HIGH
+"Canteen serving cold food and hygiene is poor",Food/Canteen,MEDIUM
+"No lights in staircase of Ladies Hostel Block A posing safety threat at night",Security,HIGH
+"Professor unavailable for project viva consultation",Faculty,MEDIUM
+"Revaluation results delayed by two weeks",Examination,MEDIUM
+"College bus AC not working during summer afternoon",Transport,LOW
+"Exposed live wire hanging near water dispenser",Electricity,HIGH
+"Restroom tap leaking water continuously wasting water",Water,LOW
+"Gym equipment cable snapped while student was training",Infrastructure,HIGH
+"Students being threatened by outside trespassers near sports field",Security,HIGH
+"Lecture audio system mic has strong feedback echo",Academic,LOW
+"Hostel mess served spoiled food causing stomach illness to 3 students",Food/Canteen,HIGH
+"Physical violence broke out near college parking area",Security,HIGH

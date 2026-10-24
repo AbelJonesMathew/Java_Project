@@ -1,0 +1,21 @@
+# CampusVoice Application Properties
+
+app.title=CampusVoice
+app.version=1.0.0
+app.tagline=Speak • Report • Get It Solved
+
+# Database Configuration
+db.url=jdbc:postgresql://localhost:5432/campusvoice
+db.user=postgres
+db.password=postgres
+db.driver=org.postgresql.Driver
+db.pool.max=10
+
+# AI Microservice REST Endpoint
+ai.service.url=http://localhost:8000
+ai.service.timeout.ms=10000
+
+# SLA Configuration (Hours)
+sla.high.hours=24
+sla.medium.hours=48
+sla.low.hours=96
