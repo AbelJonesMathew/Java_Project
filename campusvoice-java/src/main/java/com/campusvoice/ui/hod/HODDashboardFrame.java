@@ -218,6 +218,11 @@ public class HODDashboardFrame extends JFrame {
             }
             resetSidebarButtons();
             btn.setActive(true);
+            if ("COMPLAINTS".equals(cardName)) {
+                for (Component page : contentArea.getComponents()) {
+                    if (page instanceof MyComplaintsPanel complaints) complaints.loadComplaints();
+                }
+            }
             cardLayout.show(contentArea, cardName);
         });
         return btn;

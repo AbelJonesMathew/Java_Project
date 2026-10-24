@@ -23,7 +23,7 @@ public class DatabaseConfig {
     private static boolean schemaInitialized = false;
 
     static {
-        if (Boolean.getBoolean("campusvoice.offline")) {
+        if (Boolean.getBoolean("campusvoice.offline") || Boolean.getBoolean("campusvoice.local")) {
             activateH2Fallback("Offline mode explicitly requested.");
         } else {
             loadDotEnv();
@@ -35,6 +35,7 @@ public class DatabaseConfig {
         if (dbUrl != null && !dbUrl.isBlank()) return;
 
         File[] files = new File[]{
+            new File(System.getProperty("user.home"), ".campusvoice/.env"),
             new File(".env"),
             new File("../.env"),
             new File("../../.env")
@@ -123,12 +124,22 @@ public class DatabaseConfig {
     }
 
     private static void activateH2Fallback(String reason) {
-        dbUrl = "jdbc:h2:mem:campusvoice;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;NON_KEYWORDS=YEAR";
+        if (Boolean.getBoolean("campusvoice.offline")) {
+            dbUrl = "jdbc:h2:mem:campusvoice;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;NON_KEYWORDS=YEAR";
+        } else {
+            File directory = new File(System.getProperty("campusvoice.dataDir",
+                    new File(System.getProperty("user.home"), ".campusvoice/data").getPath()));
+            if (!directory.isDirectory() && !directory.mkdirs()) {
+                throw new IllegalStateException("Cannot create CampusVoice data directory: " + directory);
+            }
+            dbUrl = "jdbc:h2:file:" + new File(directory, "campusvoice").getAbsolutePath().replace('\\', '/')
+                    + ";AUTO_SERVER=TRUE;MODE=PostgreSQL;NON_KEYWORDS=YEAR";
+        }
         dbUser = "sa";
         dbPassword = "";
         isH2Fallback = true;
         schemaInitialized = false;
-        logger.info("Using high-performance in-memory H2 database with Supabase schema: {}", reason);
+        logger.info("Using {} H2 database: {}", Boolean.getBoolean("campusvoice.offline") ? "test" : "persistent local", reason);
     }
 
     public static synchronized Connection getConnection() throws SQLException {
@@ -144,8 +155,7 @@ public class DatabaseConfig {
                     }
                     return conn;
                 } catch (Exception pgEx) {
-                    logger.warn("Remote PostgreSQL connection issue ({}). Activating resilient local H2 fallback mode with merged complaints dataset.", pgEx.getMessage());
-                    activateH2Fallback("Remote PostgreSQL connection unreachable");
+                    throw new SQLException("Cannot connect to the configured shared database. Check connectivity and database settings; local mode has not been activated.", pgEx);
                 }
             }
 
@@ -176,6 +186,11 @@ public class DatabaseConfig {
             stmt.execute("CREATE TABLE IF NOT EXISTS ai_analysis (id VARCHAR(50) PRIMARY KEY, complaint_id VARCHAR(50), detected_language VARCHAR(50), original_priority VARCHAR(20), final_priority VARCHAR(20), confidence DECIMAL(5,2), reason TEXT, risk_factors TEXT, human_overridden BOOLEAN DEFAULT FALSE, model_version VARCHAR(30), analyzed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
             stmt.execute("CREATE TABLE IF NOT EXISTS audit_logs (id VARCHAR(50) PRIMARY KEY, user_id VARCHAR(50), action VARCHAR(100), entity VARCHAR(100), entity_id VARCHAR(100), details TEXT, ip_address VARCHAR(50), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
             stmt.execute("CREATE TABLE IF NOT EXISTS escalations (id VARCHAR(50) PRIMARY KEY, complaint_id VARCHAR(50), escalated_from_role VARCHAR(50), escalated_to_role VARCHAR(50), reason TEXT, sla_hours_exceeded INT DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+
+            // Seed a new local database once; never overwrite existing complaints on restart.
+            try (java.sql.ResultSet existing = stmt.executeQuery("SELECT COUNT(*) FROM users")) {
+                if (existing.next() && existing.getLong(1) > 0) return;
+            }
 
             // ROLES
             stmt.execute("MERGE INTO roles KEY(id) VALUES (1, 'STUDENT', 'Enrolled student submitting complaints')");

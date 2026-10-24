@@ -381,7 +381,9 @@ public class SubmitComplaintPanel extends RoundedPanel {
             JOptionPane.showMessageDialog(this, "Grievance submitted successfully!\nTracking Code: " + c.getComplaintCode(), "Submitted", JOptionPane.INFORMATION_MESSAGE);
             parentFrame.navigateTo("MY_COMPLAINTS");
         } else {
-            JOptionPane.showMessageDialog(this, "Failed to submit complaint. Database error.", "Error", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Could not save the complaint. Check your database connection and settings.\n"
+                    + "Diagnostic log: " + System.getProperty("user.home") + "/.campusvoice/logs/campusvoice.log",
+                    "Submission failed", JOptionPane.ERROR_MESSAGE);
         }
     }
 

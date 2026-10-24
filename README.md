@@ -43,7 +43,7 @@ CampusVoice/
 See [Windows releases](docs/WINDOWS-RELEASE.md) for portable `.exe` downloads, local packaging, and automatic GitHub Releases. Extract the full ZIP before launching `CampusVoice.exe`; no Java installation is required.
 
 ### 1. Database Setup (Optional)
-Execute `database/schema.sql` followed by `database/seed.sql` on your PostgreSQL / Supabase database instance. *(If omitted, CampusVoice automatically initializes an in-memory H2 database with demo users and complaints.)*
+Execute `database/schema.sql` followed by `database/seed.sql` on your PostgreSQL / Supabase database instance. Configure the same database for every student and HoD installation to share complaints across computers. Without PostgreSQL configuration, CampusVoice uses a persistent H2 database under the current Windows account's `.campusvoice/data` directory, initialized with demo users and complaints.
 
 ### 2. Launch Java Application (1-Click Run)
 Simply double-click `run.bat` in the root folder or execute:

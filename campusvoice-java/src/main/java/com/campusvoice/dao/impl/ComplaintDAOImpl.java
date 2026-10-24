@@ -39,7 +39,7 @@ public class ComplaintDAOImpl implements ComplaintDAO {
                 complaint.setId(UUID.randomUUID().toString());
             }
             if (complaint.getComplaintCode() == null || complaint.getComplaintCode().isBlank()) {
-                complaint.setComplaintCode("#CP" + String.format("%03d", (int)(Math.random() * 900 + 100)));
+                complaint.setComplaintCode("#CP" + UUID.randomUUID().toString().replace("-", "").substring(0, 16).toUpperCase());
             }
             if (complaint.getStatus() == null || complaint.getStatus().isBlank()) {
                 complaint.setStatus("SUBMITTED");
@@ -155,11 +155,10 @@ public class ComplaintDAOImpl implements ComplaintDAO {
     @Override
     public List<Complaint> findByDepartmentId(int departmentId) {
         List<Complaint> list = new ArrayList<>();
-        String sql = BASE_SELECT + "WHERE (u.department_id = ? OR c.category_id = ?) ORDER BY c.created_at DESC";
+        String sql = BASE_SELECT + "WHERE u.department_id = ? ORDER BY c.created_at DESC";
         try (Connection conn = DatabaseConfig.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setInt(1, departmentId);
-            stmt.setInt(2, departmentId);
             ResultSet rs = stmt.executeQuery();
             while (rs.next()) {
                 list.add(mapResultSetToComplaint(rs));

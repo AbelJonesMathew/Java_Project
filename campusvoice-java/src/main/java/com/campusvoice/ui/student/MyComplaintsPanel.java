@@ -148,16 +148,13 @@ public class MyComplaintsPanel extends RoundedPanel {
         List<Complaint> list;
         if (currentUser != null && currentUser.getRoleId() == 1) { // STUDENT
             list = complaintService.getComplaintsForStudent(currentUser.getId());
-            if (list.isEmpty()) {
-                list = complaintService.getAllComplaints();
-            }
-        } else if (currentUser != null && currentUser.getRoleId() == 2 && currentUser.getDepartmentId() != null) { // HOD
-            list = complaintService.getComplaintsForDepartment(currentUser.getDepartmentId());
-            if (list.isEmpty()) {
-                list = complaintService.getAllComplaints();
-            }
-        } else { // PRINCIPAL (3) or MANAGEMENT (4)
+        } else if (currentUser != null && currentUser.getRoleId() == 2) { // HOD
+            list = currentUser.getDepartmentId() != null
+                    ? complaintService.getComplaintsForDepartment(currentUser.getDepartmentId()) : java.util.Collections.emptyList();
+        } else if (currentUser != null && (currentUser.getRoleId() == 3 || currentUser.getRoleId() == 4)) {
             list = complaintService.getAllComplaints();
+        } else {
+            list = java.util.Collections.emptyList();
         }
 
         String pFilter = (String) priorityFilter.getSelectedItem();

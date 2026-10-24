@@ -56,6 +56,13 @@ public class HeaderPanel extends JPanel {
         metadata.add(roleLabel);
         metadata.add(Box.createVerticalStrut(5));
         metadata.add(date);
+        JLabel databaseMode = new JLabel(com.campusvoice.config.DatabaseConfig.isH2Fallback()
+                ? "Local data: this Windows account" : "Shared PostgreSQL database");
+        databaseMode.setFont(ThemeFonts.CAPTION);
+        databaseMode.setForeground(ThemeColors.TEXT_MUTED);
+        databaseMode.setAlignmentX(Component.RIGHT_ALIGNMENT);
+        metadata.add(Box.createVerticalStrut(5));
+        metadata.add(databaseMode);
         add(identity, BorderLayout.CENTER);
         add(metadata, BorderLayout.EAST);
     }
