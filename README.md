@@ -42,6 +42,8 @@ CampusVoice/
 
 See [Windows releases](docs/WINDOWS-RELEASE.md) for portable `.exe` downloads, local packaging, and automatic GitHub Releases. Extract the full ZIP before launching `CampusVoice.exe`; no Java installation is required.
 
+Version 1.0.3 remembers the shared database connection using Windows account encryption and shares evidence files through PostgreSQL. Configure each computer once using **Database connection** on the login screen.
+
 ### 1. Database Setup (Optional)
 Execute `database/schema.sql` followed by `database/seed.sql` on your PostgreSQL / Supabase database instance. Configure the same database for every student and HoD installation to share complaints across computers. Without PostgreSQL configuration, CampusVoice uses a persistent H2 database under the current Windows account's `.campusvoice/data` directory, initialized with demo users and complaints.
 

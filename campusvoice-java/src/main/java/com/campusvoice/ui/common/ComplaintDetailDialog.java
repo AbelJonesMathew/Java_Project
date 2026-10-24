@@ -312,22 +312,29 @@ public class ComplaintDetailDialog extends JDialog {
 
                 ModernButton openBtn = new ModernButton("Open File", ThemeColors.PRIMARY_BLUE);
                 openBtn.setPreferredSize(new Dimension(100, 30));
-                String storagePath = att.getStoragePath();
                 openBtn.addActionListener(ev -> {
-                    try {
-                        File f = new File(storagePath);
-                        if (f.exists() && Desktop.isDesktopSupported()) {
-                            Desktop.getDesktop().open(f);
-                        } else {
-                            JOptionPane.showMessageDialog(this,
-                                "File not found at:\n" + storagePath,
-                                "File Missing", JOptionPane.WARNING_MESSAGE);
+                    User current = SessionManager.getInstance().getCurrentUser();
+                    boolean owner = current != null && (current.getId().equals(att.getUploadedBy())
+                            || current.getId().equals(complaint.getStudentId()));
+                    openBtn.setEnabled(false);
+                    openBtn.setText("Loading...");
+                    new SwingWorker<java.nio.file.Path, Void>() {
+                        @Override protected java.nio.file.Path doInBackground() throws Exception {
+                            return new com.campusvoice.service.AttachmentService().download(att, owner);
                         }
-                    } catch (Exception ex) {
-                        JOptionPane.showMessageDialog(this,
-                            "Cannot open file: " + ex.getMessage(),
-                            "Error", JOptionPane.ERROR_MESSAGE);
-                    }
+                        @Override protected void done() {
+                            openBtn.setEnabled(true);
+                            openBtn.setText("Open File");
+                            try {
+                                File file = get().toFile();
+                                if (Desktop.isDesktopSupported()) Desktop.getDesktop().open(file);
+                                else JOptionPane.showMessageDialog(ComplaintDetailDialog.this, "Downloaded to: " + file);
+                            } catch (Exception error) {
+                                Throwable cause = error.getCause() != null ? error.getCause() : error;
+                                JOptionPane.showMessageDialog(ComplaintDetailDialog.this, cause.getMessage(), "Evidence unavailable", JOptionPane.WARNING_MESSAGE);
+                            }
+                        }
+                    }.execute();
                 });
 
                 row.add(fileLbl, BorderLayout.CENTER);
@@ -337,6 +344,39 @@ public class ComplaintDetailDialog extends JDialog {
             }
         }
 
+        User evidenceUser = SessionManager.getInstance().getCurrentUser();
+        if (evidenceUser != null && evidenceUser.getId().equals(complaint.getStudentId())) {
+            JButton upload = new JButton("Add evidence (up to 10 MB)");
+            upload.setAlignmentX(Component.LEFT_ALIGNMENT);
+            evidenceTab.add(upload);
+            upload.addActionListener(event -> {
+                JFileChooser chooser = new JFileChooser();
+                if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) return;
+                File file = chooser.getSelectedFile();
+                upload.setEnabled(false);
+                new SwingWorker<Void, Void>() {
+                    @Override protected Void doInBackground() throws Exception {
+                        Attachment attachment = new Attachment();
+                        attachment.setComplaintId(complaint.getId());
+                        attachment.setFileName(file.getName());
+                        attachment.setFileType(java.nio.file.Files.probeContentType(file.toPath()));
+                        attachment.setUploadedBy(evidenceUser.getId());
+                        new com.campusvoice.service.AttachmentService().upload(attachment, file.toPath());
+                        return null;
+                    }
+                    @Override protected void done() {
+                        upload.setEnabled(true);
+                        try {
+                            get();
+                            JOptionPane.showMessageDialog(ComplaintDetailDialog.this, "Evidence uploaded. Reopen this complaint to see the new file.");
+                        } catch (Exception error) {
+                            Throwable cause = error.getCause() != null ? error.getCause() : error;
+                            JOptionPane.showMessageDialog(ComplaintDetailDialog.this, cause.getMessage(), "Upload failed", JOptionPane.ERROR_MESSAGE);
+                        }
+                    }
+                }.execute();
+            });
+        }
         JScrollPane evScroll = new JScrollPane(evidenceTab);
         evScroll.setBorder(null);
         evScroll.getViewport().setOpaque(false);

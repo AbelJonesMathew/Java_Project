@@ -21,7 +21,7 @@ final class SharedDatabaseSetupDialog {
         form.add(new JLabel("Database password"));
         JPasswordField password = new JPasswordField();
         form.add(password);
-        JLabel status = new JLabel("Password stays in memory for this session. Reconnect after reopening.");
+        JLabel status = new JLabel("Connection is encrypted and remembered for this Windows account.");
         form.add(status);
         JButton connect = new JButton("Test and connect");
         form.add(connect);
@@ -39,7 +39,7 @@ final class SharedDatabaseSetupDialog {
             status.setText("Testing the shared database connection...");
             new SwingWorker<Void, Void>() {
                 @Override protected Void doInBackground() throws Exception {
-                    DatabaseConfig.connectSharedDatabase(connectionUrl, username, value);
+                    DatabaseConfig.connectSharedDatabase(connectionUrl, username, value, true);
                     return null;
                 }
                 @Override protected void done() {
@@ -53,8 +53,8 @@ final class SharedDatabaseSetupDialog {
                         get();
                         connected.run();
                         JOptionPane.showMessageDialog(dialog,
-                                "Connected for this session. You can sign in now.\n"
-                                + "Connect the same database on the other computers. Existing local complaints stay local.");
+                                "Connected and remembered securely. Future launches connect automatically.\n"
+                                + "Set up the same database once on each other computer. Existing local complaints stay local.");
                         dialog.dispose();
                     } catch (Exception error) {
                         Throwable cause = error.getCause() != null ? error.getCause() : error;

@@ -34,6 +34,18 @@ public class DatabaseConfig {
     private static void loadDotEnv() {
         if (dbUrl != null && !dbUrl.isBlank()) return;
 
+        try {
+            var saved = SavedDatabaseConnection.load();
+            if (saved.isPresent()) {
+                dbUrl = saved.get().getProperty("url");
+                dbUser = saved.get().getProperty("user");
+                dbPassword = saved.get().getProperty("password");
+                return;
+            }
+        } catch (java.io.IOException error) {
+            logger.warn("Saved connection could not be restored. Use Database connection to reconnect.");
+        }
+
         File[] files = new File[]{
             new File(System.getProperty("user.home"), ".campusvoice/.env"),
             new File(".env"),
@@ -144,6 +156,10 @@ public class DatabaseConfig {
 
     /** Connects this app session to a verified shared database without saving credentials to disk. */
     public static synchronized void connectSharedDatabase(String url, String user, String password) throws SQLException {
+        connectSharedDatabase(url, user, password, false);
+    }
+
+    public static synchronized void connectSharedDatabase(String url, String user, String password, boolean remember) throws SQLException {
         if (url == null || !url.startsWith("jdbc:postgresql://") || url.contains("@"))
             throw new IllegalArgumentException("Enter a JDBC PostgreSQL URL and use the separate credential fields.");
         if (user == null || user.isBlank() || password == null || password.isEmpty())
@@ -172,7 +188,11 @@ public class DatabaseConfig {
                 }
             }
         }
-        // Only replace the current connection after validation succeeds. No local data is migrated.
+        if (remember) {
+            try { SavedDatabaseConnection.save(url, user, password); }
+            catch (java.io.IOException error) { throw new SQLException("Could not save the encrypted database connection.", error); }
+        }
+        // Only replace the current connection after validation and encrypted storage succeed.
         dbUrl = url;
         dbUser = user;
         dbPassword = password;

@@ -1,9 +1,7 @@
 package com.campusvoice.ui.student;
 
 import com.campusvoice.ai.PriorityService;
-import com.campusvoice.dao.AttachmentDAO;
 import com.campusvoice.dao.CategoryDAO;
-import com.campusvoice.dao.impl.AttachmentDAOImpl;
 import com.campusvoice.dao.impl.CategoryDAOImpl;
 import com.campusvoice.model.Attachment;
 import com.campusvoice.model.Category;
@@ -25,9 +23,6 @@ import java.awt.*;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.List;
 
 public class SubmitComplaintPanel extends RoundedPanel {
@@ -373,10 +368,15 @@ public class SubmitComplaintPanel extends RoundedPanel {
 
         boolean ok = complaintService.createComplaint(c);
         if (ok) {
-            // Save evidence file attachment if one was selected
-            if (selectedEvidenceFile != null && selectedEvidenceFile.exists()) {
-                saveAttachment(c, selectedEvidenceFile);
-                selectedEvidenceFile = null; // reset after save
+            if (selectedEvidenceFile != null) {
+                if (!saveAttachment(c, selectedEvidenceFile)) {
+                    JOptionPane.showMessageDialog(this, "Complaint saved: " + c.getComplaintCode()
+                            + "\nEvidence upload failed. Open this complaint in My Complaints and use Add evidence to retry.",
+                            "Evidence not uploaded", JOptionPane.WARNING_MESSAGE);
+                    parentFrame.navigateTo("MY_COMPLAINTS");
+                    return;
+                }
+                selectedEvidenceFile = null;
             }
             JOptionPane.showMessageDialog(this, "Grievance submitted successfully!\nTracking Code: " + c.getComplaintCode(), "Submitted", JOptionPane.INFORMATION_MESSAGE);
             parentFrame.navigateTo("MY_COMPLAINTS");
@@ -387,21 +387,8 @@ public class SubmitComplaintPanel extends RoundedPanel {
         }
     }
 
-    /**
-     * Copies the evidence file into the local uploads directory and records
-     * the attachment metadata in the complaint_attachments table.
-     */
-    private void saveAttachment(Complaint complaint, File file) {
+    private boolean saveAttachment(Complaint complaint, File file) {
         try {
-            // Create local uploads directory next to the jar / working dir
-            Path uploadsDir = Paths.get(System.getProperty("user.home"), ".campusvoice", "uploads");
-            Files.createDirectories(uploadsDir);
-
-            // Use a unique filename to avoid collisions
-            String safeName = System.currentTimeMillis() + "_" + file.getName();
-            Path dest = uploadsDir.resolve(safeName);
-            Files.copy(file.toPath(), dest, StandardCopyOption.REPLACE_EXISTING);
-
             User u = SessionManager.getInstance().getCurrentUser();
             String mimeType = Files.probeContentType(file.toPath());
 
@@ -410,16 +397,12 @@ public class SubmitComplaintPanel extends RoundedPanel {
             att.setFileName(file.getName());
             att.setFileType(mimeType != null ? mimeType : "application/octet-stream");
             att.setFileSize(file.length());
-            att.setStoragePath(dest.toAbsolutePath().toString());
             att.setUploadedBy(u != null ? u.getId() : null);
 
-            AttachmentDAO attachmentDAO = new AttachmentDAOImpl();
-            if (!attachmentDAO.saveAttachment(att)) {
-                // Non-critical – the complaint is already saved; just log silently
-                System.err.println("[WARN] Could not save attachment record for complaint " + complaint.getComplaintCode());
-            }
+            new com.campusvoice.service.AttachmentService().upload(att, file.toPath());
+            return true;
         } catch (IOException e) {
-            System.err.println("[WARN] Failed to copy evidence file: " + e.getMessage());
+            return false;
         }
     }
 }

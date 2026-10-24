@@ -1,5 +1,6 @@
 # Environment & Secrets
 .env
+*.dpapi
 *.env.local
 
 # Java / Maven Build outputs

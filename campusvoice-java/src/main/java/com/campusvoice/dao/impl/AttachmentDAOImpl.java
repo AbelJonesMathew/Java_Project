@@ -2,131 +2,135 @@ package com.campusvoice.dao.impl;
 
 import com.campusvoice.config.DatabaseConfig;
 import com.campusvoice.dao.AttachmentDAO;
-import com.campusvoice.dao.ComplaintDAO;
 import com.campusvoice.model.Attachment;
-import com.campusvoice.model.Complaint;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 public class AttachmentDAOImpl implements AttachmentDAO {
     private static final Logger logger = LoggerFactory.getLogger(AttachmentDAOImpl.class);
+    public static final int MAX_FILE_BYTES = 10 * 1024 * 1024;
 
-    // Ensure the complaint_attachments table exists (H2 fallback creates it here too)
-    static {
-        try (Connection conn = DatabaseConfig.getConnection();
-             Statement stmt = conn.createStatement()) {
-            stmt.execute(
-                "CREATE TABLE IF NOT EXISTS complaint_attachments (" +
-                "id VARCHAR(50) PRIMARY KEY, " +
-                "complaint_id VARCHAR(50) NOT NULL, " +
-                "file_name VARCHAR(255) NOT NULL, " +
-                "file_type VARCHAR(100) NOT NULL, " +
-                "file_size BIGINT NOT NULL, " +
-                "storage_path TEXT NOT NULL, " +
-                "uploaded_by VARCHAR(50), " +
-                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
-            );
-        } catch (SQLException e) {
-            // Table may already exist with UUID type in PostgreSQL – that's fine
-            LoggerFactory.getLogger(AttachmentDAOImpl.class)
-                .debug("complaint_attachments table already exists or using PostgreSQL schema: {}", e.getMessage());
+    private void ensureTables(Connection connection) throws SQLException {
+        boolean postgres = connection.getMetaData().getDatabaseProductName().equals("PostgreSQL");
+        String idType = postgres ? "UUID" : "VARCHAR(50)";
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("CREATE TABLE IF NOT EXISTS complaint_attachments (id " + idType
+                    + " PRIMARY KEY, complaint_id " + idType + " NOT NULL, file_name VARCHAR(255) NOT NULL, "
+                    + "file_type VARCHAR(100) NOT NULL, file_size BIGINT NOT NULL, storage_path TEXT NOT NULL, "
+                    + "uploaded_by " + idType + ", created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+            statement.execute("CREATE TABLE IF NOT EXISTS complaint_attachment_data (attachment_id VARCHAR(50) PRIMARY KEY, "
+                    + "file_content " + (postgres ? "BYTEA" : "VARBINARY") + " NOT NULL)");
         }
     }
+    private void bindId(PreparedStatement statement, int index, String id) throws SQLException {
+        if (id == null || id.isBlank()) { statement.setNull(index, Types.OTHER); return; }
+        if (statement.getConnection().getMetaData().getDatabaseProductName().equals("PostgreSQL"))
+            statement.setObject(index, UUID.fromString(id));
+        else statement.setString(index, id);
+    }
+    @Override public boolean saveAttachment(Attachment attachment) { return saveAttachment(attachment, null); }
 
-    @Override
-    public boolean saveAttachment(Attachment a) {
-        String sql = "INSERT INTO complaint_attachments (id, complaint_id, file_name, file_type, file_size, storage_path, uploaded_by) " +
-                     "VALUES (?, ?, ?, ?, ?, ?, ?)";
-        try (Connection conn = DatabaseConfig.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-
-            String id = UUID.randomUUID().toString();
+    @Override public boolean saveAttachment(Attachment attachment, byte[] content) {
+        if (content != null && content.length > MAX_FILE_BYTES) throw new IllegalArgumentException("Evidence files must be 10 MB or smaller.");
+        String id = UUID.randomUUID().toString();
+        String complaintId = attachment.getComplaintId();
+        if (complaintId != null && complaintId.startsWith("#"))
+            complaintId = new ComplaintDAOImpl().findByCode(complaintId).map(c -> c.getId()).orElse(complaintId);
+        String storage = content == null ? attachment.getStoragePath() : "database:" + id;
+        try (Connection connection = DatabaseConfig.getConnection()) {
+            ensureTables(connection);
+            connection.setAutoCommit(false);
             try {
-                stmt.setObject(1, UUID.fromString(id));
-            } catch (Exception e) {
-                stmt.setString(1, id);
-            }
-
-            String targetComplaintId = a.getComplaintId();
-            if (targetComplaintId != null && (targetComplaintId.startsWith("#") || targetComplaintId.startsWith("CP") || targetComplaintId.length() < 30)) {
-                try {
-                    ComplaintDAO cDao = new ComplaintDAOImpl();
-                    Optional<Complaint> found = cDao.findByCode(targetComplaintId);
-                    if (found.isPresent()) {
-                        targetComplaintId = found.get().getId();
-                    }
-                } catch (Exception ignored) {}
-            }
-
-            try {
-                stmt.setObject(2, UUID.fromString(targetComplaintId));
-            } catch (Exception e) {
-                stmt.setString(2, targetComplaintId);
-            }
-
-            stmt.setString(3, a.getFileName());
-            stmt.setString(4, a.getFileType() != null ? a.getFileType() : "application/octet-stream");
-            stmt.setLong(5, a.getFileSize());
-            stmt.setString(6, a.getStoragePath());
-
-            if (a.getUploadedBy() != null && !a.getUploadedBy().isBlank()) {
-                try {
-                    stmt.setObject(7, UUID.fromString(a.getUploadedBy()));
-                } catch (Exception e) {
-                    stmt.setString(7, a.getUploadedBy());
+                try (PreparedStatement statement = connection.prepareStatement(
+                        "INSERT INTO complaint_attachments (id, complaint_id, file_name, file_type, file_size, storage_path, uploaded_by) VALUES (?, ?, ?, ?, ?, ?, ?)")) {
+                    bindId(statement, 1, id);
+                    bindId(statement, 2, complaintId);
+                    statement.setString(3, attachment.getFileName());
+                    statement.setString(4, attachment.getFileType() != null ? attachment.getFileType() : "application/octet-stream");
+                    statement.setLong(5, content != null ? content.length : attachment.getFileSize());
+                    statement.setString(6, storage);
+                    bindId(statement, 7, attachment.getUploadedBy());
+                    statement.executeUpdate();
                 }
-            } else {
-                stmt.setNull(7, java.sql.Types.OTHER);
-            }
-
-            return stmt.executeUpdate() > 0;
-        } catch (SQLException e) {
-            logger.error("Error saving attachment for complaint {}", a.getComplaintId(), e);
+                if (content != null) insertContent(connection, id, content);
+                connection.commit();
+                attachment.setId(id);
+                attachment.setStoragePath(storage);
+                return true;
+            } catch (SQLException | RuntimeException error) { connection.rollback(); throw error; }
+        } catch (SQLException error) {
+            logger.error("Could not save evidence for complaint {}", attachment.getComplaintId(), error);
             return false;
         }
     }
-
-    @Override
-    public List<Attachment> findByComplaintId(String complaintId) {
-        List<Attachment> list = new ArrayList<>();
-        String targetComplaintId = complaintId;
-        if (targetComplaintId != null && (targetComplaintId.startsWith("#") || targetComplaintId.startsWith("CP") || targetComplaintId.length() < 30)) {
-            try {
-                ComplaintDAO cDao = new ComplaintDAOImpl();
-                Optional<Complaint> found = cDao.findByCode(targetComplaintId);
-                if (found.isPresent()) {
-                    targetComplaintId = found.get().getId();
-                }
-            } catch (Exception ignored) {}
+    private void insertContent(Connection connection, String id, byte[] content) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "INSERT INTO complaint_attachment_data (attachment_id, file_content) VALUES (?, ?)")) {
+            statement.setString(1, id);
+            statement.setBytes(2, content);
+            statement.executeUpdate();
         }
-
-        String sql = "SELECT * FROM complaint_attachments WHERE CAST(complaint_id AS VARCHAR) = ? OR CAST(complaint_id AS VARCHAR) = ? ORDER BY created_at DESC";
-        try (Connection conn = DatabaseConfig.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setString(1, complaintId);
-            stmt.setString(2, targetComplaintId);
-            ResultSet rs = stmt.executeQuery();
-            while (rs.next()) {
-                Attachment a = new Attachment();
-                a.setId(rs.getString("id"));
-                a.setComplaintId(rs.getString("complaint_id"));
-                a.setFileName(rs.getString("file_name"));
-                a.setFileType(rs.getString("file_type"));
-                a.setFileSize(rs.getLong("file_size"));
-                a.setStoragePath(rs.getString("storage_path"));
-                a.setUploadedBy(rs.getString("uploaded_by"));
-                a.setCreatedAt(rs.getTimestamp("created_at"));
-                list.add(a);
+    }
+    @Override public byte[] getContent(String attachmentId) throws SQLException {
+        try (Connection connection = DatabaseConfig.getConnection()) {
+            ensureTables(connection);
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "SELECT file_content FROM complaint_attachment_data WHERE attachment_id = ?")) {
+                statement.setString(1, attachmentId);
+                try (ResultSet result = statement.executeQuery()) { return result.next() ? result.getBytes(1) : null; }
             }
-        } catch (SQLException e) {
-            logger.error("Error loading attachments for complaint {}", complaintId, e);
         }
-        return list;
+    }
+    @Override public boolean storeContent(String attachmentId, byte[] content) {
+        if (content == null || content.length > MAX_FILE_BYTES) throw new IllegalArgumentException("Evidence files must be 10 MB or smaller.");
+        try (Connection connection = DatabaseConfig.getConnection()) {
+            ensureTables(connection);
+            connection.setAutoCommit(false);
+            try {
+                try (PreparedStatement statement = connection.prepareStatement(
+                        "UPDATE complaint_attachments SET storage_path = ?, file_size = ? WHERE CAST(id AS VARCHAR) = ?")) {
+                    statement.setString(1, "database:" + attachmentId);
+                    statement.setLong(2, content.length);
+                    statement.setString(3, attachmentId);
+                    if (statement.executeUpdate() != 1) { connection.rollback(); return false; }
+                }
+                try (PreparedStatement statement = connection.prepareStatement("DELETE FROM complaint_attachment_data WHERE attachment_id = ?")) {
+                    statement.setString(1, attachmentId);
+                    statement.executeUpdate();
+                }
+                insertContent(connection, attachmentId, content);
+                connection.commit();
+                return true;
+            } catch (SQLException error) { connection.rollback(); throw error; }
+        } catch (SQLException error) { logger.error("Could not upload existing evidence {}", attachmentId, error); return false; }
+    }
+    @Override public List<Attachment> findByComplaintId(String complaintId) {
+        String target = complaintId;
+        if (target != null && target.startsWith("#")) target = new ComplaintDAOImpl().findByCode(target).map(c -> c.getId()).orElse(target);
+        List<Attachment> attachments = new ArrayList<>();
+        try (Connection connection = DatabaseConfig.getConnection()) {
+            ensureTables(connection);
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "SELECT * FROM complaint_attachments WHERE CAST(complaint_id AS VARCHAR) = ? ORDER BY created_at DESC")) {
+                statement.setString(1, target);
+                try (ResultSet result = statement.executeQuery()) {
+                    while (result.next()) {
+                        Attachment attachment = new Attachment();
+                        attachment.setId(result.getString("id"));
+                        attachment.setComplaintId(result.getString("complaint_id"));
+                        attachment.setFileName(result.getString("file_name"));
+                        attachment.setFileType(result.getString("file_type"));
+                        attachment.setFileSize(result.getLong("file_size"));
+                        attachment.setStoragePath(result.getString("storage_path"));
+                        attachment.setUploadedBy(result.getString("uploaded_by"));
+                        attachment.setCreatedAt(result.getTimestamp("created_at"));
+                        attachments.add(attachment);
+                    }
+                }
+            }
+        } catch (SQLException error) { logger.error("Could not load evidence for complaint {}", complaintId, error); }
+        return attachments;
     }
 }

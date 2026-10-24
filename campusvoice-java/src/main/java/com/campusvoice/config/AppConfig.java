@@ -4,7 +4,7 @@ public class AppConfig {
     public static final String APP_NAME = "CampusVoice";
     public static final String TAGLINE = "Speak • Report • Get It Solved";
     public static final String SECONDARY_TAGLINE = "A Smart Complaint Management System with AI Priority Detection & Multilingual Support";
-    public static final String VERSION = "1.0.2";
+    public static final String VERSION = "1.0.3";
 
     // Institutional Details
     public static final String COLLEGE_NAME = "St. Joseph's College of Engineering and Technology, Palai (Autonomous)";

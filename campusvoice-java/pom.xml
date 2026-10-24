@@ -6,7 +6,7 @@
 
     <groupId>com.campusvoice</groupId>
     <artifactId>campusvoice-java</artifactId>
-    <version>1.0.2</version>
+    <version>1.0.3</version>
     <name>CampusVoice</name>
     <description>Smart College Complaint Management System with AI Priority Detection &amp; Multilingual Support</description>
 
