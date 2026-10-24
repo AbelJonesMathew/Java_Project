@@ -24,7 +24,7 @@ SUPABASE_DB_PASSWORD=YOUR_PASSWORD
 
 Never upload your .env file or database credentials to GitHub or include them in a release. Errors are recorded in `%USERPROFILE%/.campusvoice/logs/campusvoice.log`.
 
-The executable is unsigned. Windows may display a publisher warning.
+The current executable is unsigned. Windows may display a publisher warning, and Smart App Control can block it. See [trusted signing setup](WINDOWS-SIGNING.md) for the signing requirements and prepared build commands.
 
 ## Build from source
 
