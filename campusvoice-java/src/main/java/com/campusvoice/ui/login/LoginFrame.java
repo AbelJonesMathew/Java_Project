@@ -440,6 +440,11 @@ public class LoginFrame extends JFrame {
         });
 
         optionsRow.add(rememberCheckBox, BorderLayout.WEST);
+        JButton databaseButton = new JButton("Database connection");
+        databaseButton.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        databaseButton.addActionListener(e -> SharedDatabaseSetupDialog.show(this,
+                () -> errorLabel.setText("Shared database connected. Sign in to continue.")));
+        optionsRow.add(databaseButton, BorderLayout.CENTER);
         optionsRow.add(forgotLabel, BorderLayout.EAST);
         gbc.insets = new Insets(4, 0, 2, 0);
         gbc.gridy = row++;

@@ -4,7 +4,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 public class AIConfig {
-    public static final String APP_VERSION = "1.0.1";
+    public static final String APP_VERSION = "1.0.2";
     public static final double CONFIDENCE_THRESHOLD = 0.75; // 75%
     public static final int DEFAULT_SERVER_PORT = 8000;
 

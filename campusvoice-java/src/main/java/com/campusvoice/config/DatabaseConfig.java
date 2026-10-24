@@ -120,7 +120,7 @@ public class DatabaseConfig {
         }
 
         dbUrl = working;
-        logger.info("Configured Supabase / PostgreSQL Database URL: {}", dbUrl);
+        logger.info("Shared PostgreSQL database configured.");
     }
 
     private static void activateH2Fallback(String reason) {
@@ -140,6 +140,45 @@ public class DatabaseConfig {
         isH2Fallback = true;
         schemaInitialized = false;
         logger.info("Using {} H2 database: {}", Boolean.getBoolean("campusvoice.offline") ? "test" : "persistent local", reason);
+    }
+
+    /** Connects this app session to a verified shared database without saving credentials to disk. */
+    public static synchronized void connectSharedDatabase(String url, String user, String password) throws SQLException {
+        if (url == null || !url.startsWith("jdbc:postgresql://") || url.contains("@"))
+            throw new IllegalArgumentException("Enter a JDBC PostgreSQL URL and use the separate credential fields.");
+        if (user == null || user.isBlank() || password == null || password.isEmpty())
+            throw new IllegalArgumentException("Enter the database username and password.");
+        for (String value : new String[]{url, user, password}) {
+            if (value.contains("\n") || value.contains("\r"))
+                throw new IllegalArgumentException("Each connection field must fit on one line.");
+        }
+        java.util.Properties options = new java.util.Properties();
+        options.setProperty("user", user);
+        options.setProperty("password", password);
+        options.setProperty("sslmode", "require");
+        options.setProperty("connectTimeout", "10");
+        options.setProperty("socketTimeout", "15");
+        try (Connection connection = DriverManager.getConnection(url, options)) {
+            connection.setReadOnly(true);
+            try (Statement statement = connection.createStatement()) {
+                statement.setQueryTimeout(15);
+                statement.executeQuery("SELECT id, department_id FROM users WHERE 1=0").close();
+                statement.executeQuery("SELECT id, student_id, complaint_code FROM complaints WHERE 1=0").close();
+                statement.executeQuery("SELECT id FROM complaint_categories WHERE 1=0").close();
+                try (java.sql.ResultSet permissions = statement.executeQuery(
+                        "SELECT has_table_privilege(current_user, 'complaints', 'INSERT')")) {
+                    if (!permissions.next() || !permissions.getBoolean(1))
+                        throw new SQLException("The database account cannot submit complaints.");
+                }
+            }
+        }
+        // Only replace the current connection after validation succeeds. No local data is migrated.
+        dbUrl = url;
+        dbUser = user;
+        dbPassword = password;
+        parseAndCleanUrl();
+        isH2Fallback = false;
+        schemaInitialized = true;
     }
 
     public static synchronized Connection getConnection() throws SQLException {
